@@ -9,6 +9,30 @@ How to use
     shell > node prj/example-nodejs-server/server.js
 
   * client
+    
+    * install socket.io
+      [git]
+      git submodule add https://github.com/LearnBoost/Socket.IO.git Resources/socket.io
+
+    * DIR
+      prj/
+       - README
+       - LICENSE
+       - tiapp.xml
+       - Resources/
+        - app.js
+        - socket.io-titanium.js
+        - socket.io/
+          - package.json
+          - socket.io.js
+          - lib/
+            - io.js
+            - socket.js
+            - util.js
+            - transport.js
+            - transports/
+              - xhr.js
+              - xhr-polling.js
 
     [js code]
     require('socket.io-titanium');
