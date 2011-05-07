@@ -19,6 +19,8 @@ How to use
        - README
        - LICENSE
        - tiapp.xml
+       - example-nodejs-server/
+         - server.js
        - Resources/
         - app.js
         - socket.io-titanium.js

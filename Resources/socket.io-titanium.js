@@ -1,7 +1,8 @@
 require('socket.io/lib/io');
 
+var io = this.io;
+
 (function (){
-  var io = this.io;
   io.util = {
     inherit: function(ctor, superCtor){
       for(var i in superCtor.prototype){
