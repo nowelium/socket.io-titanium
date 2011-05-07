@@ -1,0 +1,38 @@
+socket.io-titanium
+------------------
+
+How to use
+==========
+
+  * run server
+
+    shell > node prj/example-nodejs-server/server.js
+
+  * client
+
+    [js code]
+    require('socket.io-titanium');
+
+    var socket = new io.Socket('169.254.10.100', { port: 8080 });
+    socket.connect();
+    socket.send('hello world!!');
+    socket.on('message', function (message){
+      Titanium.API.debug('got message: ' + message);
+    });
+
+Notes
+=====
+
+  * Mac OSX
+    
+  run with iphonesim:
+    set localnetwork alias localhost(127.0.0.1)::
+
+    shell > sudo ifconfig lo0 alias 169.254.10.100 netmask 0xffffff
+    
+    run iphonesimlator..
+
+    [js code]
+      var socket = new io.Socket('169.254.10.100', { port: 8080 });
+      socket.connect()..
+.
