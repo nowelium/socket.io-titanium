@@ -16,8 +16,11 @@ var io = this.io;
         }
       }
     },
+    defer: function(fn){
+      setTimeout(fn, 100);
+    },
     isArray: function(obj){
-      return '[object Array]' == Object.prototype.toString.call(obj);
+      return Object.prototype.toString.call(obj) === '[object Array]';
     },
     indexOf: function(arr, item, from){
       for (var l = arr.length, i = (from < 0) ? Math.max(0, l + from) : from || 0; i < l; i++){
@@ -28,12 +31,11 @@ var io = this.io;
       return -1;
     }
   };
+  io.util.webkit = true;
+
   io.util.load = function(fn){
     return fn();
   };
-  io.util.android = /android/i.test(Titanium.Platform.osname);
-  io.util.ios = /iphone/i.test(Titanium.Platform.osname);
-  io.util.opera = false;
 })();
 
 (function (){
@@ -66,7 +68,7 @@ var io = this.io;
     io.util.merge(this.options, options);
     this.connected = false;
     this.connecting = false;
-    this._events = {};
+    this.events = {};
     this.transport = this.getTransport();
     if (!this.transport){
       Titanium.API.error('No transport available');
@@ -76,7 +78,7 @@ var io = this.io;
     Socket.prototype[proto] = io.Socket.prototype[proto];
   }
   io.Socket = Socket;
-  io.Socket.prototype._isXDomain = function (){
+  io.Socket.prototype.isXDomain = function (){
     return true;
   };
 })();
@@ -91,7 +93,7 @@ var io = this.io;
     }
     return String(message);
   };
-  io.Transport._encode = function(messages){
+  io.Transport.prototype.encode = function(messages){
     var ret = '', message, messages = io.util.isArray(messages) ? messages : [messages];
     for (var i = 0, l = messages.length; i < l; i++){
       message = messages[i] === null || messages[i] === undefined ? '' : stringify(messages[i]);
@@ -109,12 +111,12 @@ var io = this.io;
   io.Transport.XHR.check = function(xdomain){
     return true;
   };
-  io.Transport.XHR.prototype._request = function(url, method, multipart){
-    var req = io.Transport.XHR.request(this.base._isXDomain());
+  io.Transport.XHR.prototype.request = function(url, method, multipart){
+    var req = io.Transport.XHR.request(this.base.isXDomain());
     if (multipart) {
       req.multipart = true;
     }
-    req.open(method || 'GET', this._prepareUrl() + (url ? '/' + url : ''));
+    req.open(method || 'GET', this.prepareUrl() + (url ? '/' + url : ''));
     if (method == 'POST' && 'setRequestHeader' in req){
       req.setRequestHeader('Content-type', 'application/x-www-form-urlencoded; charset=utf-8');
     }
