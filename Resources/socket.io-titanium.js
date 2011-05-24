@@ -17,7 +17,7 @@ var io = this.io;
       }
     },
     isArray: function(obj){
-      return null != obj && 'length' in obj && 'splice' in obj && 'join' in obj;
+      return '[object Array]' == Object.prototype.toString.call(obj);
     },
     indexOf: function(arr, item, from){
       for (var l = arr.length, i = (from < 0) ? Math.max(0, l + from) : from || 0; i < l; i++){

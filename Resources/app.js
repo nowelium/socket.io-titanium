@@ -1,25 +1,23 @@
 Titanium.UI.setBackgroundColor('#FFF');
 
-require('socket.io-titanium');
-
-var socket = new io.Socket('169.254.10.100', { port: 8080 });
-socket.connect();
-socket.send('hello world!!');
-socket.on('message', function (message){
-  Titanium.API.debug('got message: ' + message);
-});
-
-var win = Titanium.UI.createWindow({
+var win_ti = Titanium.UI.createWindow({
   barColor: '#369',
-  tabBarHidden: true,
-  title: 'demo'
+  title: 'ti',
+  url: 'win_ti.js'
 });
-win.add(Titanium.UI.createLabel({
-  text: 'check console output'
-}));
+var win_web = Titanium.UI.createWindow({
+  barColor: '#963',
+  title: 'webview',
+  url: 'win_webview.js'
+});
 
 var tabGroup = Titanium.UI.createTabGroup();
 tabGroup.addTab(Titanium.UI.createTab({
-  window: win
-}));  
+  window: win_ti,
+  title: win_ti.title
+}));
+tabGroup.addTab(Titanium.UI.createTab({
+  window: win_web,
+  title: win_web.title
+}));
 tabGroup.open();

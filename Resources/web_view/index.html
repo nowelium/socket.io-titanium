@@ -1,0 +1,39 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="height=device-height, width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>chat sample</title>
+    <script type="text/javascript" src="../socket.io/socket.io.js"></script>
+    <script type="text/javascript">
+    var $ = function(id){
+      return document.getElementById(id);
+    };
+    window.addEventListener('load', function (){
+      var socket = new io.Socket('169.254.10.100', {port: 8080});
+      socket.connect();
+
+      socket.on('message', function (message){
+        var li = document.createElement('li');
+        li.textContent = message;
+        $('messages').appendChild(li);
+      });
+      $('submit').addEventListener('click', function (){
+        var messageValue = $('message').value;
+        if(/^\s+$/.test(messageValue)){
+          return;
+        }
+
+        socket.send(messageValue);
+        $('message').value = '';
+      });
+    });
+    </script>
+  </head>
+  <body>
+    <input type="text" id="message" value="" placeholder="message here" />
+    <input type="submit" id="submit" value="send" />
+    <p>messages</p>
+    <ul id="messages"></ul>
+  </body>
+</html>
