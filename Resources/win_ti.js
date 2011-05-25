@@ -2,29 +2,40 @@ var io = require('socket.io-titanium');
 
 var win = Titanium.UI.currentWindow;
 
-var header = Titanium.UI.createView({
-  top: 0,
-  height: 60,
-  width: win.width,
-  borderWidth: 2,
-  borderColor: '#333'
-});
-var input = Titanium.UI.createTextField({
-  top: 10,
-  height: 40,
-  width: 200,
-  color: '#333',
-  hintText: 'message here'
-});
-var table = Titanium.UI.createTableView({
-  top: 60,
-  height: win.height - 60,
-  width: win.width
-});
+if(/android/i.test(Titanium.Platform.osname)){
+  var input = Titanium.UI.createSearchBar({
+    showCancel: false
+  });
+  var table = Titanium.UI.createTableView({
+    search: input
+  });
+  win.add(table);
+} else {
+  var header = Titanium.UI.createView({
+    top: 0,
+    height: 60,
+    width: win.width,
+    borderWidth: 2,
+    borderColor: '#333'
+  });
+  var input = Titanium.UI.createTextField({
+    top: 10,
+    height: 40,
+    width: 200,
+    color: '#333',
+    hintText: 'message here'
+  });
+  var table = Titanium.UI.createTableView({
+    top: 60,
+    height: win.height - 60,
+    width: win.width
+  });
 
-win.add(header);
-win.add(input);
-win.add(table);
+  win.add(header);
+  win.add(input);
+  win.add(table);
+}
+
 
 //var socket = new io.Socket('169.254.10.100', { port: 8080 });
 // or
