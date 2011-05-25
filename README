@@ -4,11 +4,11 @@ socket.io-titanium
 How to use
 ==========
 
-  * run server
+  * run server(chat server)
 
-    shell > node prj/example-nodejs-server/server.js
+    shell > node prj/example-nodejs-server/chat.js
 
-  * client
+  * client(chat client)
     
     * install socket.io
       [git]
@@ -21,6 +21,7 @@ How to use
        - tiapp.xml
        - example-nodejs-server/
          - server.js
+         - chat.js
        - Resources/
         - app.js
         - socket.io-titanium.js
@@ -37,8 +38,11 @@ How to use
               - xhr-polling.js
 
     [js code]
-    require('socket.io-titanium');
+    var io = require('socket.io-titanium');
 
+    //var socket = new io.Socket('169.254.10.100', { port: 8080 });
+    // or
+    //var socket = io.createSocket('169.254.10.100', { port: 8080 });
     var socket = new io.Socket('169.254.10.100', { port: 8080 });
     socket.connect();
     socket.send('hello world!!');
@@ -51,7 +55,7 @@ Notes
 
   * Mac OSX
     
-  run with iphonesim:
+  run with iphonesim or android:
     set localnetwork alias localhost(127.0.0.1)::
 
     shell > sudo ifconfig lo0 alias 169.254.10.100 netmask 0xffffff
