@@ -101,6 +101,18 @@ var io = this.io;
     }
     return ret;
   };
+
+
+  if(/android/i.test(Titanium.Platform.osname)){
+    var onData = io.Transport.prototype.onData;
+    // override onData: Android xhr.responseText returns null
+    io.Transport.prototype.onData = function (data){
+      if(null == data){
+        data = '';
+      }
+      return onData.call(this, data);
+    };
+  }
 })();
 
 (function (){
@@ -123,11 +135,7 @@ var io = this.io;
     return req;
   };
   io.Transport.XHR.request = function (){
-    var client = Titanium.Network.createHTTPClient();
-    if(/android/i.test(Titanium.Platform.osname)){
-      client.responseText = '';
-    }
-    return client;
+    return Titanium.Network.createHTTPClient();
   };
 })();
 

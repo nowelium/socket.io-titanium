@@ -1,4 +1,4 @@
-require('socket.io-titanium');
+var io = require('socket.io-titanium');
 
 var win = Titanium.UI.currentWindow;
 
@@ -26,6 +26,9 @@ win.add(header);
 win.add(input);
 win.add(table);
 
+//var socket = new io.Socket('169.254.10.100', { port: 8080 });
+// or
+//var socket = io.createSocket('169.254.10.100', { port: 8080 });
 var socket = new io.Socket('169.254.10.100', { port: 8080 });
 socket.connect();
 socket.on('message', function (message){
