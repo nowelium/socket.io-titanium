@@ -123,8 +123,20 @@ var io = this.io;
     return req;
   };
   io.Transport.XHR.request = function (){
-    return Titanium.Network.createHTTPClient();
+    var client = Titanium.Network.createHTTPClient();
+    if(/android/i.test(Titanium.Platform.osname)){
+      client.responseText = '';
+    }
+    return client;
   };
 })();
 
 require('socket.io/lib/transports/xhr-polling');
+
+exports = {
+  io: io,
+  Socket: io.Socket,
+  createSocket: function (host, options){
+    return new io.Socket(host, options);
+  }
+};
