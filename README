@@ -10,10 +10,6 @@ How to use
 
   * client(chat client)
     
-    * install socket.io
-      [git]
-      git submodule add https://github.com/LearnBoost/Socket.IO.git Resources/socket.io
-
     * DIR
       prj/
        - README
