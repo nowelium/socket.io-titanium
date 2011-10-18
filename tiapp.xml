@@ -16,6 +16,7 @@
     <navbar-hidden>false</navbar-hidden>
     <analytics>true</analytics>
 <guid>4c1e8c41-3922-47a1-8d04-3b67b937f303</guid>
+<property name="ti.android.threadstacksize" type="int">32768</property>
 	<iphone>
 		<orientations device="iphone">
 			<orientation>Ti.UI.PORTRAIT</orientation>

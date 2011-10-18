@@ -17,10 +17,19 @@ require('socket.io/lib/transports/xhr');
 io.transports.forEach(function(t){
   require('socket.io/lib/transports/' + t);
 });
+
 require('socket.io/lib/socket');
 
+io.Socket.prototype.isXDomain = function (){
+  return false;
+};
 io.util.request = function (){
   return Titanium.Network.createHTTPClient();
 };
 
-exports = io;
+exports = {
+  io: io,
+  connect: function (){
+    return io.connect.apply(io, arguments);
+  }
+};
