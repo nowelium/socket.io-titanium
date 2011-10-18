@@ -1,161 +1,366 @@
+
 /**
- * socket.io-node-client
+ * socket.io
  * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
  * MIT Licensed
  */
 
-(function(){
-  var io = this.io,
-  
+(function (exports, global) {
+
   /**
-   * Set when the `onload` event is executed on the page. This variable is used by
-   * `io.util.load` to detect if we need to execute the function immediately or add
-   * it to a onload listener.
+   * Utilities namespace.
    *
-   * @type {Boolean}
-   * @api private
-   */
-  pageLoaded = false;
-  
-  /**
    * @namespace
    */
-  io.util = {
-    /**
-     * Executes the given function when the page is loaded.
-     *
-     * Example:
-     *
-     *     io.util.load(function(){ console.log('page loaded') });
-     *
-     * @param {Function} fn
-     * @api public
-     */
-    load: function(fn){
-      if (/loaded|complete/.test(document.readyState) || pageLoaded) return fn();
-      if ('attachEvent' in window){
-        window.attachEvent('onload', fn);
-      } else {
-        window.addEventListener('load', fn, false);
-      }
-    },
-    
-    /**
-     * Defers the function untill it's the function can be executed without
-     * blocking the load process. This is especially needed for WebKit based
-     * browsers. If a long running connection is made before the onload event
-     * a loading indicator spinner will be present at all times untill a
-     * reconnect has been made.
-     *
-     * @param {Function} fn
-     * @api public
-     */
-    defer: function(fn){
-      if (!io.util.webkit) return fn();
-      io.util.load(function(){
-        setTimeout(fn,100);
-      });
-    },
-    
-    /**
-     * Inherit the prototype methods from one constructor into another.
-     *
-     * Example:
-     *
-     *     function foo(){};
-     *     foo.prototype.hello = function(){ console.log( this.words )};
-     *     
-     *     function bar(){
-     *       this.words = "Hello world";
-     *     };
-     *     
-     *     io.util.inherit(bar,foo);
-     *     var person = new bar();
-     *     person.hello();
-     *     // => "Hello World"
-     *
-     * @param {Constructor} ctor The constructor that needs to inherit the methods.
-     * @param {Constructor} superCtor The constructor to inherit from.
-     * @api public
-     */
-    inherit: function(ctor, superCtor){
-      // no support for `instanceof` for now
-      for (var i in superCtor.prototype){
-        ctor.prototype[i] = superCtor.prototype[i];
-      }
-    },
-    
-    /**
-     * Finds the index of item in a given Array.
-     *
-     * Example:
-     *
-     *     var data = ['socket',2,3,4,'socket',5,6,7,'io'];
-     *     io.util.indexOf(data,'socket',1);
-     *     // => 4
-     *
-     * @param {Array} arr The array
-     * @param item The item that we need to find
-     * @param {Integer} from Starting point
-     * @api public
-     */
-    indexOf: function(arr, item, from){
-      for (var l = arr.length, i = (from < 0) ? Math.max(0, l + from) : from || 0; i < l; i++){
-        if (arr[i] === item) return i;
-      }
-      return -1;
-    },
-    
-    /**
-     * Checks if the given object is an Array.
-     *
-     * Example:
-     *
-     *     io.util.isArray([]);
-     *     // => true
-     *     io.util.isArray({});
-     *    // => false
-     *
-     * @param obj
-     * @api public
-     */
-    isArray: function(obj){
-      return Object.prototype.toString.call(obj) === '[object Array]';
-    },
-    
-    /**
-     * Merges the properties of two objects.
-     *
-     * Example:
-     *
-     *     var a = {foo:'bar'}
-     *       , b = {bar:'baz'};
-     *     
-     *     io.util.merge(a,b);
-     *     // => {foo:'bar',bar:'baz'}
-     *
-     * @param {Object} target The object that receives the keys
-     * @param {Object} additional The object that supplies the keys
-     * @api public
-     */
-    merge: function(target, additional){
-      for (var i in additional)
-        if (additional.hasOwnProperty(i))
-          target[i] = additional[i];
-    }
-  };
-  
+
+  var util = exports.util = {};
+
   /**
-   * Detect the Webkit platform based on the userAgent string.
-   * This includes Mobile Webkit.
+   * Parses an URI
    *
-   * @type {Boolean}
+   * @author Steven Levithan <stevenlevithan.com> (MIT license)
    * @api public
    */
-  io.util.webkit = /webkit/i.test(navigator.userAgent);
-  
-  io.util.load(function(){
-    pageLoaded = true;
-  });
 
-})();
+  var re = /^(?:(?![^:@]+:[^:@\/]*@)([^:\/?#.]+):)?(?:\/\/)?((?:(([^:@]*)(?::([^:@]*))?)?@)?([^:\/?#]*)(?::(\d*))?)(((\/(?:[^?#](?![^?#\/]*\.[^?#\/.]+(?:[?#]|$)))*\/?)?([^?#\/]*))(?:\?([^#]*))?(?:#(.*))?)/;
+
+  var parts = ['source', 'protocol', 'authority', 'userInfo', 'user', 'password',
+               'host', 'port', 'relative', 'path', 'directory', 'file', 'query',
+               'anchor'];
+
+  util.parseUri = function (str) {
+    var m = re.exec(str || '')
+      , uri = {}
+      , i = 14;
+
+    while (i--) {
+      uri[parts[i]] = m[i] || '';
+    }
+
+    return uri;
+  };
+
+  /**
+   * Produces a unique url that identifies a Socket.IO connection.
+   *
+   * @param {Object} uri
+   * @api public
+   */
+
+  util.uniqueUri = function (uri) {
+    var protocol = uri.protocol
+      , host = uri.host
+      , port = uri.port;
+
+    if ('document' in global) {
+      host = host || document.domain;
+      port = port || (protocol == 'https'
+        && document.location.protocol !== 'https:' ? 443 : document.location.port);
+    } else {
+      host = host || 'localhost';
+
+      if (!port && protocol == 'https') {
+        port = 443;
+      }
+    }
+
+    return (protocol || 'http') + '://' + host + ':' + (port || 80);
+  };
+
+  /**
+   * Mergest 2 query strings in to once unique query string
+   *
+   * @param {String} base
+   * @param {String} addition
+   * @api public
+   */
+
+  util.query = function (base, addition) {
+    var query = util.chunkQuery(base || '')
+      , components = [];
+
+    util.merge(query, util.chunkQuery(addition || ''));
+    for (var part in query) {
+      if (query.hasOwnProperty(part)) {
+        components.push(part + '=' + query[part]);
+      }
+    }
+
+    return components.length ? '?' + components.join('&') : '';
+  };
+
+  /**
+   * Transforms a querystring in to an object
+   *
+   * @param {String} qs
+   * @api public
+   */
+
+  util.chunkQuery = function (qs) {
+    var query = {}
+      , params = qs.split('&')
+      , i = 0
+      , l = params.length
+      , kv;
+
+    for (; i < l; ++i) {
+      kv = params[i].split('=');
+      if (kv[0]) {
+        query[kv[0]] = decodeURIComponent(kv[1]);
+      }
+    }
+
+    return query;
+  };
+
+  /**
+   * Executes the given function when the page is loaded.
+   *
+   *     io.util.load(function () { console.log('page loaded'); });
+   *
+   * @param {Function} fn
+   * @api public
+   */
+
+  var pageLoaded = false;
+
+  util.load = function (fn) {
+    if ('document' in global && document.readyState === 'complete' || pageLoaded) {
+      return fn();
+    }
+
+    util.on(global, 'load', fn, false);
+  };
+
+  /**
+   * Adds an event.
+   *
+   * @api private
+   */
+
+  util.on = function (element, event, fn, capture) {
+    if (element.attachEvent) {
+      element.attachEvent('on' + event, fn);
+    } else if (element.addEventListener) {
+      element.addEventListener(event, fn, capture);
+    }
+  };
+
+  /**
+   * Generates the correct `XMLHttpRequest` for regular and cross domain requests.
+   *
+   * @param {Boolean} [xdomain] Create a request that can be used cross domain.
+   * @returns {XMLHttpRequest|false} If we can create a XMLHttpRequest.
+   * @api private
+   */
+
+  util.request = function (xdomain) {
+    // if node
+    var XMLHttpRequest = require('xmlhttprequest').XMLHttpRequest;
+    return new XMLHttpRequest();
+    // end node
+
+    if ('undefined' != typeof window) {
+      if (xdomain && window.XDomainRequest) {
+        return new XDomainRequest();
+      }
+
+      if (window.XMLHttpRequest && (!xdomain || util.ua.hasCORS)) {
+        return new XMLHttpRequest();
+      }
+
+      if (!xdomain) {
+        try {
+          return new window.ActiveXObject('Microsoft.XMLHTTP');
+        } catch(e) { }
+      }
+    }
+
+    return null;
+  };
+
+  /**
+   * XHR based transport constructor.
+   *
+   * @constructor
+   * @api public
+   */
+
+  /**
+   * Change the internal pageLoaded value.
+   */
+
+  if ('undefined' != typeof window) {
+    util.load(function () {
+      pageLoaded = true;
+    });
+  }
+
+  /**
+   * Defers a function to ensure a spinner is not displayed by the browser
+   *
+   * @param {Function} fn
+   * @api public
+   */
+
+  util.defer = function (fn) {
+    if (!util.ua.webkit) {
+      return fn();
+    }
+
+    util.load(function () {
+      setTimeout(fn, 100);
+    });
+  };
+
+  /**
+   * Merges two objects.
+   *
+   * @api public
+   */
+  
+  util.merge = function merge (target, additional, deep, lastseen) {
+    var seen = lastseen || []
+      , depth = typeof deep == 'undefined' ? 2 : deep
+      , prop;
+
+    for (prop in additional) {
+      if (additional.hasOwnProperty(prop) && util.indexOf(seen, prop) < 0) {
+        if (typeof target[prop] !== 'object' || !depth) {
+          target[prop] = additional[prop];
+          seen.push(additional[prop]);
+        } else {
+          util.merge(target[prop], additional[prop], depth - 1, seen);
+        }
+      }
+    }
+
+    return target;
+  };
+
+  /**
+   * Merges prototypes from objects
+   *
+   * @api public
+   */
+  
+  util.mixin = function (ctor, ctor2) {
+    util.merge(ctor.prototype, ctor2.prototype);
+  };
+
+  /**
+   * Shortcut for prototypical and static inheritance.
+   *
+   * @api private
+   */
+
+  util.inherit = function (ctor, ctor2) {
+    function f() {};
+    f.prototype = ctor2.prototype;
+    ctor.prototype = new f;
+  };
+
+  /**
+   * Checks if the given object is an Array.
+   *
+   *     io.util.isArray([]); // true
+   *     io.util.isArray({}); // false
+   *
+   * @param Object obj
+   * @api public
+   */
+
+  util.isArray = Array.isArray || function (obj) {
+    return Object.prototype.toString.call(obj) === '[object Array]';
+  };
+
+  /**
+   * Intersects values of two arrays into a third
+   *
+   * @api public
+   */
+
+  util.intersect = function (arr, arr2) {
+    var ret = []
+      , longest = arr.length > arr2.length ? arr : arr2
+      , shortest = arr.length > arr2.length ? arr2 : arr;
+
+    for (var i = 0, l = shortest.length; i < l; i++) {
+      if (~util.indexOf(longest, shortest[i]))
+        ret.push(shortest[i]);
+    }
+
+    return ret;
+  }
+
+  /**
+   * Array indexOf compatibility.
+   *
+   * @see bit.ly/a5Dxa2
+   * @api public
+   */
+
+  util.indexOf = function (arr, o, i) {
+    if (Array.prototype.indexOf) {
+      return Array.prototype.indexOf.call(arr, o, i);
+    }
+
+    for (var j = arr.length, i = i < 0 ? i + j < 0 ? 0 : i + j : i || 0; 
+         i < j && arr[i] !== o; i++);
+
+    return j <= i ? -1 : i;
+  };
+
+  /**
+   * Converts enumerables to array.
+   *
+   * @api public
+   */
+
+  util.toArray = function (enu) {
+    var arr = [];
+
+    for (var i = 0, l = enu.length; i < l; i++)
+      arr.push(enu[i]);
+
+    return arr;
+  };
+
+  /**
+   * UA / engines detection namespace.
+   *
+   * @namespace
+   */
+
+  util.ua = {};
+
+  /**
+   * Whether the UA supports CORS for XHR.
+   *
+   * @api public
+   */
+
+  util.ua.hasCORS = 'undefined' != typeof window && window.XMLHttpRequest &&
+  (function () {
+    try {
+      var a = new XMLHttpRequest();
+    } catch (e) {
+      return false;
+    }
+
+    return a.withCredentials != undefined;
+  })();
+
+  /**
+   * Detect webkit.
+   *
+   * @api public
+   */
+
+  util.ua.webkit = 'undefined' != typeof navigator
+    && /webkit/i.test(navigator.userAgent);
+
+})(
+    'undefined' != typeof window ? io : module.exports
+  , this
+);

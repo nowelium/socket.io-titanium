@@ -1,35 +1,47 @@
+
 /**
- * socket.io-node-client
+ * socket.io
  * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
  * MIT Licensed
  */
 
-(function(){
-  var io = this.io,
-  
+(function (exports, io) {
+
   /**
-   * The WebSocket transport uses the HTML5 WebSocket API to establish an persistent
-   * connection with the Socket.IO server. This transport will also be inherited by the
-   * FlashSocket fallback as it provides a API compatible polyfill for the WebSockets.
+   * Expose constructor.
+   */
+
+  exports.websocket = WS;
+
+  /**
+   * The WebSocket transport uses the HTML5 WebSocket API to establish an
+   * persistent connection with the Socket.IO server. This transport will also
+   * be inherited by the FlashSocket fallback as it provides a API compatible
+   * polyfill for the WebSockets.
    *
    * @constructor
    * @extends {io.Transport}
    * @api public
    */
-  WS = io.Transport.websocket = function(){
+
+  function WS (socket) {
     io.Transport.apply(this, arguments);
   };
-  
-  io.util.inherit(WS, io.Transport);
-  
+
   /**
-   * The transport type, you use this to identify which transport was chosen.
+   * Inherits from Transport.
+   */
+
+  io.util.inherit(WS, io.Transport);
+
+  /**
+   * Transport name
    *
-   * @type {String}
    * @api public
    */
-  WS.prototype.type = 'websocket';
-  
+
+  WS.prototype.name = 'websocket';
+
   /**
    * Initializes a new `WebSocket` connection with the Socket.IO server. We attach
    * all the appropriate listeners to handle the responses from the server.
@@ -37,38 +49,78 @@
    * @returns {Transport}
    * @api public
    */
-  WS.prototype.connect = function(){
-    var self = this;
-    this.socket = new WebSocket(this.prepareUrl());
-    this.socket.onmessage = function(ev){ self.onData(ev.data); };
-    this.socket.onclose = function(ev){ self.onDisconnect(); };
-    this.socket.onerror = function(e){ self.onError(e); };
+
+  WS.prototype.open = function () {
+    var query = io.util.query(this.socket.options.query)
+      , self = this
+      , Socket
+
+    // if node
+    Socket = require('websocket-client').WebSocket;
+    // end node
+
+    if (!Socket) {
+      Socket = window.MozWebSocket || window.WebSocket;
+    }
+
+    this.websocket = new Socket(this.prepareUrl() + query);
+
+    this.websocket.onopen = function () {
+      self.onOpen();
+      self.socket.setBuffer(false);
+    };
+    this.websocket.onmessage = function (ev) {
+      self.onData(ev.data);
+    };
+    this.websocket.onclose = function () {
+      self.onClose();
+      self.socket.setBuffer(true);
+    };
+    this.websocket.onerror = function (e) {
+      self.onError(e);
+    };
+
     return this;
   };
-  
+
   /**
-   * Send a message to the Socket.IO server. The message will automatically be encoded
-   * in the correct message format.
+   * Send a message to the Socket.IO server. The message will automatically be
+   * encoded in the correct message format.
    *
    * @returns {Transport}
    * @api public
    */
-  WS.prototype.send = function(data){
-    if (this.socket) this.socket.send(this.encode(data));
+
+  WS.prototype.send = function (data) {
+    this.websocket.send(data);
     return this;
   };
-  
+
+  /**
+   * Payload
+   *
+   * @api private
+   */
+
+  WS.prototype.payload = function (arr) {
+    for (var i = 0, l = arr.length; i < l; i++) {
+      this.packet(arr[i]);
+    }
+    return this;
+  };
+
   /**
    * Disconnect the established `WebSocket` connection.
    *
    * @returns {Transport}
    * @api public
    */
-  WS.prototype.disconnect = function(){
-    if (this.socket) this.socket.close();
+
+  WS.prototype.close = function () {
+    this.websocket.close();
     return this;
   };
-  
+
   /**
    * Handle the errors that `WebSocket` might be giving when we
    * are attempting to connect or send messages.
@@ -76,26 +128,20 @@
    * @param {Error} e The error.
    * @api private
    */
-  WS.prototype.onError = function(e){
-    this.base.emit('error', [e]);
+
+  WS.prototype.onError = function (e) {
+    this.socket.onError(e);
   };
-  
+
   /**
-   * Generate a `WebSocket` compatible URL based on the options
-   * the user supplied in our Socket.IO base.
+   * Returns the appropriate scheme for the URI generation.
    *
-   * @returns {String} Connection url
    * @api private
    */
-  WS.prototype.prepareUrl = function(){
-    return (this.base.options.secure ? 'wss' : 'ws') 
-    + '://' + this.base.host 
-    + ':' + this.base.options.port
-    + '/' + this.base.options.resource
-    + '/' + this.type
-    + (this.sessionid ? ('/' + this.sessionid) : '');
+  WS.prototype.scheme = function () {
+    return this.socket.options.secure ? 'wss' : 'ws';
   };
-  
+
   /**
    * Checks if the browser has support for native `WebSockets` and that
    * it's not the polyfill created for the FlashSocket transport.
@@ -103,19 +149,35 @@
    * @return {Boolean}
    * @api public
    */
-  WS.check = function(){
-    // we make sure WebSocket is not confounded with a previously loaded flash WebSocket
-    return 'WebSocket' in window && WebSocket.prototype && ( WebSocket.prototype.send && !!WebSocket.prototype.send.toString().match(/native/i)) && typeof WebSocket !== "undefined";
+
+  WS.check = function () {
+    // if node
+    return true;
+    // end node
+    return ('WebSocket' in window && !('__addTask' in WebSocket))
+          || 'MozWebSocket' in window;
   };
-  
+
   /**
    * Check if the `WebSocket` transport support cross domain communications.
    *
    * @returns {Boolean}
    * @api public
    */
-  WS.xdomainCheck = function(){
+
+  WS.xdomainCheck = function () {
     return true;
   };
-  
-})();
+
+  /**
+   * Add the transport to your public io.transports array.
+   *
+   * @api private
+   */
+
+  io.transports.push('websocket');
+
+})(
+    'undefined' != typeof io ? io.Transport : module.exports
+  , 'undefined' != typeof io ? io : module.parent.exports
+);
