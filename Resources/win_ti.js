@@ -36,12 +36,7 @@ if(/android/i.test(Titanium.Platform.osname)){
   win.add(table);
 }
 
-
-//var socket = new io.Socket('169.254.10.100', { port: 8080 });
-// or
-//var socket = io.createSocket('169.254.10.100', { port: 8080 });
-var socket = new io.Socket('169.254.10.100', { port: 8080 });
-socket.connect();
+var socket = io.connect('169.254.10.100:8080');
 socket.on('message', function (message){
   table.appendRow({title: message}, {animationStyle: Titanium.UI.iPhone.RowAnimationStyle.LEFT});
 });

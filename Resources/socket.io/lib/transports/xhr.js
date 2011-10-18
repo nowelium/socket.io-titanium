@@ -1,99 +1,76 @@
+
 /**
- * socket.io-node-client
+ * socket.io
  * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
  * MIT Licensed
  */
 
-(function(){
-  var io = this.io,
-  
+(function (exports, io, global) {
+
   /**
-   * A small stub function that will be used to reduce memory leaks.
+   * Expose constructor.
    *
-   * @type {Function}
-   * @api private
-   */
-  empty = new Function,
-  
-  /**
-   * We preform a small feature detection to see if `Cross Origin Resource Sharing`
-   * is supported in the `XMLHttpRequest` object, so we can use it for cross domain requests.
-   *
-   * @type {Boolean}
-   * @api private
-   */ 
-  XMLHttpRequestCORS = (function(){
-    if (!('XMLHttpRequest' in window)) return false;
-    // CORS feature detection
-    var a = new XMLHttpRequest();
-    return a.withCredentials != undefined;
-  })(),
-  
-  /**
-   * Generates the correct `XMLHttpRequest` for regular and cross domain requests.
-   *
-   * @param {Boolean} [xdomain] Create a request that can be used cross domain.
-   * @returns {XMLHttpRequest|false} If we can create a XMLHttpRequest we will return that.
-   * @api private
-   */
-  request = function(xdomain){
-    if ('XDomainRequest' in window && xdomain) return new XDomainRequest();
-    if ('XMLHttpRequest' in window && (!xdomain || XMLHttpRequestCORS)) return new XMLHttpRequest();
-    if (!xdomain){
-      try {
-        var a = new ActiveXObject('MSXML2.XMLHTTP');
-        return a;
-      } catch(e){}
-    
-      try {
-        var b = new ActiveXObject('Microsoft.XMLHTTP');
-        return b;
-      } catch(e){}
-    }
-    return false;
-  },
-  
-  /**
-   * This is the base for XHR based transports, the `XHR-Polling` and the `XHR-multipart` 
-   * transports will extend this class.
-   *
-   * @constructor
-   * @extends {io.Transport}
-   * @property {Array} sendBuffer Used to queue up messages so they can be send as one request.
    * @api public
    */
-  XHR = io.Transport.XHR = function(){
+  
+  exports.XHR = XHR;
+
+  /**
+   * XHR constructor
+   *
+   * @costructor
+   * @api public
+   */
+
+  function XHR (socket) {
+    if (!socket) return;
+
     io.Transport.apply(this, arguments);
     this.sendBuffer = [];
   };
-  
+
+  /**
+   * Inherits from Transport.
+   */
+
   io.util.inherit(XHR, io.Transport);
-  
+
   /**
    * Establish a connection
    *
    * @returns {Transport}
    * @api public
    */
-  XHR.prototype.connect = function(){
+
+  XHR.prototype.open = function () {
+    this.socket.setBuffer(false);
+    this.onOpen();
     this.get();
+
+    // we need to make sure the request succeeds since we have no indication
+    // whether the request opened or not until it succeeded.
+    this.setCloseTimeout();
+
     return this;
   };
-  
+
   /**
-   * Check if we need to send data to the Socket.IO server, if we have data in our buffer
-   * we encode it and forward it to the sendIORequest method.
+   * Check if we need to send data to the Socket.IO server, if we have data in our
+   * buffer we encode it and forward it to the `post` method.
    *
    * @api private
    */
-  XHR.prototype.checkSend = function(){
-    if (!this.posting && this.sendBuffer.length){
-      var encoded = this.encode(this.sendBuffer);
-      this.sendBuffer = [];
-      this.sendIORequest(encoded);
+
+  XHR.prototype.payload = function (payload) {
+    var msgs = [];
+
+    for (var i = 0, l = payload.length; i < l; i++) {
+      msgs.push(io.parser.encodePacket(payload[i]));
     }
+
+    this.send(io.parser.encodePayload(msgs));
   };
-  
+
   /**
    * Send data to the Socket.IO server.
    *
@@ -101,97 +78,105 @@
    * @returns {Transport}
    * @api public
    */
-  XHR.prototype.send = function(data){
-    if (io.util.isArray(data)){
-      this.sendBuffer.push.apply(this.sendBuffer, data);
-    } else {
-      this.sendBuffer.push(data);
-    }
-    this.checkSend();
+
+  XHR.prototype.send = function (data) {
+    this.post(data);
     return this;
   };
-  
+
   /**
    * Posts a encoded message to the Socket.IO server.
    *
    * @param {String} data A encoded message.
    * @api private
    */
-  XHR.prototype.sendIORequest = function(data){
+
+  function empty () { };
+
+  XHR.prototype.post = function (data) {
     var self = this;
-    this.posting = true;
-    this.sendXHR = this.request('send', 'POST');
-    this.sendXHR.onreadystatechange = function(){
-      var status;
-      if (self.sendXHR.readyState == 4){
-        self.sendXHR.onreadystatechange = empty;
-        try { status = self.sendXHR.status; } catch(e){}
+    this.socket.setBuffer(true);
+
+    function stateChange () {
+      if (this.readyState == 4) {
+        this.onreadystatechange = empty;
         self.posting = false;
-        if (status == 200){
-          self.checkSend();
+
+        if (this.status == 200){
+          self.socket.setBuffer(false);
         } else {
-          self.onDisconnect();
+          self.onClose();
         }
       }
+    }
+
+    function onload () {
+      this.onload = empty;
+      self.socket.setBuffer(false);
     };
-    this.sendXHR.send('data=' + encodeURIComponent(data));
+
+    this.sendXHR = this.request('POST');
+
+    if (global.XDomainRequest && this.sendXHR instanceof XDomainRequest) {
+      this.sendXHR.onload = this.sendXHR.onerror = onload;
+    } else {
+      this.sendXHR.onreadystatechange = stateChange;
+    }
+
+    this.sendXHR.send(data);
   };
-  
+
   /**
-   * Disconnect the established connection.
+   * Disconnects the established `XHR` connection.
    *
-   * @returns {Transport}.
+   * @returns {Transport} 
    * @api public
    */
-  XHR.prototype.disconnect = function(){
-    // send disconnection signal
-    this.onDisconnect();
+
+  XHR.prototype.close = function () {
+    this.onClose();
     return this;
   };
-  
-  /**
-   * Handle the disconnect request.
-   *
-   * @api private
-   */
-  XHR.prototype.onDisconnect = function(){
-    if (this.xhr){
-      this.xhr.onreadystatechange = empty;
-      try {
-        this.xhr.abort();
-      } catch(e){}
-      this.xhr = null;
-    }
-    if (this.sendXHR){
-      this.sendXHR.onreadystatechange = empty;
-      try {
-        this.sendXHR.abort();
-      } catch(e){}
-      this.sendXHR = null;
-    }
-    this.sendBuffer = [];
-    io.Transport.prototype.onDisconnect.call(this);
-  };
-  
+
   /**
    * Generates a configured XHR request
    *
    * @param {String} url The url that needs to be requested.
    * @param {String} method The method the request should use.
-   * @param {Boolean} multipart Do a multipart XHR request
    * @returns {XMLHttpRequest}
    * @api private
    */
-  XHR.prototype.request = function(url, method, multipart){
-    var req = request(this.base.isXDomain());
-    if (multipart) req.multipart = true;
-    req.open(method || 'GET', this.prepareUrl() + (url ? '/' + url : ''));
-    if (method == 'POST' && 'setRequestHeader' in req){
-      req.setRequestHeader('Content-type', 'application/x-www-form-urlencoded; charset=utf-8');
+
+  XHR.prototype.request = function (method) {
+    var req = io.util.request(this.socket.isXDomain())
+      , query = io.util.query(this.socket.options.query, 't=' + +new Date);
+
+    req.open(method || 'GET', this.prepareUrl() + query, true);
+
+    if (method == 'POST') {
+      try {
+        if (req.setRequestHeader) {
+          req.setRequestHeader('Content-type', 'text/plain;charset=UTF-8');
+        } else {
+          // XDomainRequest
+          req.contentType = 'text/plain';
+        }
+      } catch (e) {}
     }
+
     return req;
   };
-  
+
+  /**
+   * Returns the scheme to use for the transport URLs.
+   *
+   * @api private
+   */
+
+  XHR.prototype.scheme = function () {
+    return this.socket.options.secure ? 'https' : 'http';
+  };
+
   /**
    * Check if the XHR transports are supported
    *
@@ -199,23 +184,30 @@
    * @returns {Boolean}
    * @api public
    */
-  XHR.check = function(xdomain){
+
+  XHR.check = function (socket, xdomain) {
     try {
-      if (request(xdomain)) return true;
-    } catch(e){}
+      if (io.util.request(xdomain)) {
+        return true;
+      }
+    } catch(e) {}
+
     return false;
   };
-  
+
   /**
    * Check if the XHR transport supports corss domain requests.
    * 
    * @returns {Boolean}
    * @api public
    */
-  XHR.xdomainCheck = function(){
-    return XHR.check(true);
+
+  XHR.xdomainCheck = function () {
+    return XHR.check(null, true);
   };
-  
-  XHR.request = request;
-  
-})();
+
+})(
+    'undefined' != typeof io ? io.Transport : module.exports
+  , 'undefined' != typeof io ? io : module.parent.exports
+  , this
+);

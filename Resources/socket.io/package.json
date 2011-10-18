@@ -1,18 +1,33 @@
-{ "name": "socket.io-browser"
-, "description": "Browser-side code for Socket.IO"
-, "version": "0.6.2"
-, "main" : "./socket.io.js"
-,  "homepage": "http://socket.io"
-, "repository":
-  { "type": "git"
-  , "url": "git://github.com/LearnBoost/Socket.IO.git"
-  }
-, "author": "LearnBoost"
-, "licenses" :
-  [ { "type" : "MIT"
-    , "url" : "http://github.com/learnboost/Socket.IO/raw/master/README.md"
-  } ]
-, "engines": { "node": "*" }
-, "scripts" :
-  { "install" : "bin/build" }
+{
+    "name": "socket.io-client"
+  , "description": "Socket.IO client for the browser and node.js"
+  , "version": "0.7.11"
+  , "main" : "./lib/io.js"
+  , "browserify": "./dist/socket.io.js"
+  , "homepage": "http://socket.io"
+  , "keywords": ["websocket", "socket", "realtime", "socket.io", "comet", "ajax"]
+  , "author": "Guillermo Rauch <guillermo@learnboost.com>"
+  , "contributors": [
+        { "name": "Guillermo Rauch", "email": "rauchg@gmail.com" }
+      , { "name": "Arnout Kazemier", "email": "info@3rd-eden.com" }
+      , { "name": "Vladimir Dronnikov", "email": "dronnikov@gmail.com" }
+    ]
+  , "repository": {
+        "type": "git"
+      , "url": "https://github.com/LearnBoost/Socket.IO.git"
+    }
+  , "dependencies": {
+        "uglify-js": "1.0.6"
+      , "websocket-client": "1.0.0"
+      , "xmlhttprequest": "1.2.2"
+    }
+  , "devDependencies": {
+        "expresso": "0.7.7"
+      , "express": "2.3.11"
+      , "jade": "0.12.1"
+      , "stylus": "0.13.3"
+      , "socket.io": "0.7.11"
+      , "socket.io-client": "0.7.11"
+    }
+  , "engines": { "node": ">= 0.4.0" }
 }
