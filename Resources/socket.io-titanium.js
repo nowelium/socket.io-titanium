@@ -13,9 +13,9 @@ require('socket.io/lib/events');
 require('socket.io/lib/namespace');
 require('socket.io/lib/transport');
 
+require('socket.io/lib/transports/websocket');
 require('socket.io/lib/transports/xhr');
 require('socket.io/lib/transports/xhr-polling');
-require('socket.io/lib/transports/websocket');
 
 require('socket.io/lib/socket');
 
