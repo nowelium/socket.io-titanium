@@ -67,8 +67,6 @@ io.connect = function (host, details) {
   return socket.of(uri.path.length > 1 ? uri.path : '');
 };
 
-Ti.API.debug(io);
-
 exports = {
   io: io,
   connect: function (){
