@@ -1,3 +1,17 @@
+var platform = {
+  isAndroid: /android/i.test(Titanium.Platform.osname),
+  isIPhone: /iphone/i.test(Titanium.Platform.osname),
+  os: function(obj){
+    if(platform.isIPhone){
+      return obj.iphone();
+    }
+    if(platform.isAndroid){
+      return obj.android();
+    }
+    return obj.otherwise();
+  }
+};
+
 var global = this;
 var io = this.io = global.io = {};
 io.version = '0.8.7';
@@ -6,18 +20,41 @@ io.transports = [];
 io.j = [];
 io.sockets = {};
 
-require('socket.io/lib/util');
-require('socket.io/lib/json');
-require('socket.io/lib/parser');
-require('socket.io/lib/events');
-require('socket.io/lib/namespace');
-require('socket.io/lib/transport');
+//
+// titanium mobile 1.8.0.1 CommonJS compat for ios,android
+//
+platform.os({
+  iphone: function (){
+    require('socket.io/lib/util');
+    require('socket.io/lib/json');
 
-require('socket.io/lib/transports/websocket');
-require('socket.io/lib/transports/xhr');
-require('socket.io/lib/transports/xhr-polling');
+    require('socket.io/lib/parser');
+    require('socket.io/lib/events');
+    require('socket.io/lib/namespace');
+    require('socket.io/lib/transport');
 
-require('socket.io/lib/socket');
+    require('socket.io/lib/transports/websocket');
+    require('socket.io/lib/transports/xhr');
+    require('socket.io/lib/transports/xhr-polling');
+
+    require('socket.io/lib/socket');
+  },
+  android: function (){
+    // "require" wrongly global scope handling
+    Titanium.include(
+      'socket.io/lib/util.js',
+      'socket.io/lib/json.js',
+      'socket.io/lib/parser.js',
+      'socket.io/lib/events.js',
+      'socket.io/lib/namespace.js',
+      'socket.io/lib/transport.js',
+      'socket.io/lib/transports/xhr.js',
+      'socket.io/lib/transports/websocket.js',
+      'socket.io/lib/transports/xhr-polling.js',
+      'socket.io/lib/socket.js'
+    );
+  }
+});
 
 // {{{ @lib/transports/ws
 // titanium-websocket-client :: https://github.com/masuidrive/ti-websocket-client
@@ -25,7 +62,7 @@ var WebSocket = require('ti-websocket-client/ti-websocket-client').WebSocket;
 io.Transport.websocket.prototype.open = function (){
   var query = io.util.query(this.socket.options.query)
     , self = this
-    , Socket
+    , Socket;
 
   var Socket = WebSocket;
 
@@ -98,9 +135,7 @@ io.connect = function (host, details) {
 };
 // }}} @lib/util.js
 
-exports = {
-  io: io,
-  connect: function (){
-    return io.connect.apply(io, arguments);
-  }
+exports.io = io;
+exports.connect = function (){
+  return io.connect.apply(io, arguments);
 };

@@ -24,6 +24,8 @@ How to use
        - Resources/
         - app.js
         - socket.io-titanium.js
+        - ti-websocket-client/
+          - ti-websocket-client.js
         - socket.io/
           - package.json
           - lib/
@@ -34,6 +36,7 @@ How to use
             - transports/
               - xhr.js
               - xhr-polling.js
+              - ...
 
     [js code]
     var io = require('socket.io-titanium');
