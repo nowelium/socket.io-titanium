@@ -1,22 +1,54 @@
 var io = require('socket.io').listen(8080);
 
-var c = [];
-io.sockets.on('connection', function(client){
-  console.log('connect: ' + client.id);
-  client.broadcast.emit('user connected');
-  c.push(client);
+var archiveMessages = {};
+var channels = ['foo channel', 'bar channel'];
 
-  client.on('message', function (message){
-    console.log('client message: ' + message);
-    client.send('rely:' + message);
-    client.broadcast.emit(client.id + ' says: ' + message);
-    // emulate broadcast
-    c.forEach(function(e){
-      e.send(' says: ' + message);
+var chat = io.of('/chat');
+chat.on('connection', function(socket){
+  console.log('connected: %s', socket.id);
+
+  // push available channel list
+  socket.emit('available_channel', channels);
+
+  socket.on('join', function(value){
+    console.log('%s joined channel: %s', socket.id, value.channelId);
+
+    socket.join(value.channelId);
+    socket.set('channel_id', value.channelId, function(){
+      var messages = archiveMessages[value.channelId] || [];
+      socket.emit('joined', messages);
+      socket.broadcast.to(value.channelId).emit('user:join', {
+        id: socket.id
+      });
     });
   });
 
-  client.on('disconnect', function(){
-    console.log('disconnect: ' + client.id);
+  socket.on('post', function(message){
+    socket.get('channel_id', function(err, channelId){
+      console.log('%s says<%s channel>: %s', socket.id, channelId, message);
+
+      if(!(channelId in archiveMessages)){
+        archiveMessages[channelId] = [];
+      }
+      archiveMessages[channelId].push(message);
+
+      socket.emit('posted', {
+        message: message
+      });
+      socket.broadcast.to(channelId).emit('user:message', {
+        id: socket.id,
+        message: message
+      });
+    });
+  });
+
+  socket.on('disconnect', function(){
+    console.log('%s disconnected', socket.id);
+    socket.get('channel_id', function(channelId){
+      socket.leave(channelId);
+      socket.broadcast.to(channelId).emit('user:leave', {
+        id: socket.id
+      });
+    });
   });
 });

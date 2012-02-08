@@ -4,6 +4,11 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="height=device-height, width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <title>chat sample</title>
+    <style>
+    #rooms button {
+      display: block;
+    }
+    </style>
     <script type="text/javascript" src="../socket.io/dist/socket.io.js"></script>
     <script type="text/javascript">
     var $ = function(id){
@@ -12,27 +17,69 @@
     window.addEventListener('load', function (){
       var socket = io.connect('169.254.10.100:8080');
 
-      socket.on('message', function (message){
-        var li = document.createElement('li');
-        li.textContent = message;
-        $('messages').appendChild(li);
+      var chat = socket.of('/chat');
+      chat.on('available_channel', function(channels){
+        channels.forEach(function (channelId){
+          var button = document.createElement('button');
+          button.appendChild(document.createTextNode(channelId));
+
+          $('rooms').appendChild(button);
+          button.addEventListener('click', function(){
+            $('chat').style.display = '';
+            chat.emit('join', {
+              channelId: channelId
+            });
+          });
+        });
       });
+
+      var addMessage = function(message){
+        var li = document.createElement('li');
+        li.appendChild(document.createTextNode(message));
+        $('messages').appendChild(li);
+      };
+      chat.on('joined', function(messages){
+        messages.forEach(function(message){
+          var li = document.createElement('li');
+          li.appendChild(document.createTextNode(message));
+          $('archives').appendChild(li);
+        });
+      });
+      chat.on('posted', function(value){
+        return addMessage('you posted: ' + value.message);
+      });
+      chat.on('user:join', function(value){
+        return addMessage(value.id + ' joined this channel');
+      });
+      chat.on('user:leave', function(value){
+        return addMessage(value.id + ' leaved this channel');
+      });
+      chat.on('user:message', function(value){
+        return addMessage(value.id + ' says ' + value.message);
+      });
+
       $('submit').addEventListener('click', function (){
         var messageValue = $('message').value;
         if(/^\s+$/.test(messageValue)){
           return;
         }
 
-        socket.send(messageValue);
+        chat.emit('post', messageValue);
         $('message').value = '';
       });
     });
     </script>
   </head>
   <body>
-    <input type="text" id="message" value="" placeholder="message here" />
-    <input type="submit" id="submit" value="send" />
-    <p>messages</p>
-    <ul id="messages"></ul>
+    <div id="rooms">
+    </div>
+    <div id="chat" style="display:none">
+      <input type="text" id="message" value="" placeholder="message here" />
+      <input type="submit" id="submit" value="send" />
+      <p>archives</p>
+      <ul id="archives" style="color: #999"></ul>
+      <p>messages</p>
+      <ul id="messages"></ul>
+    </div>
   </body>
 </html>
