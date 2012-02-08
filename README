@@ -38,12 +38,32 @@ How to use
               - xhr-polling.js
               - ...
 
-    [js code]
-    var io = require('socket.io-titanium');
+Example
+=======
+
+  channel chat titanium example: Resources/win_ti.js
+  channel chat server example: example-nodejs-server/chat.js
+
+    va io = require('socket.io-titanium');
     var socket = io.connect('169.254.10.100:8080');
-    socket.send('hello world!!');
-    socket.on('message', function (message){
-      Titanium.API.debug('got message: ' + message);
+    var chat = socket.of('/chat');
+    chat.on('available_channel', function (channels){
+      channels.forEach(function (channelName){
+        var row = Ti.UI.createTableViewRow({ title: channelName });
+        ...
+      });
+      ...
+    });
+    chat.on('broadcat:message', function(message){
+      ....
+    });
+
+    input.addEventListener('return', function(){
+      chat.emit('post', input.value);
+    });
+    
+    win.addEventListener('open', function(){
+      chat.emit('join:channel', channelId);
     });
 
 Notes
