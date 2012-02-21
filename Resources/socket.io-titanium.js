@@ -76,15 +76,15 @@ WebSocket.readyState = {
   CLOSED: 3
 };
 WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
-	if(typeof last_frame === 'undefined') {
-		last_frame = true;
-	}
-	
-	if(last_frame === false && opcode >= 0x8 && opcode <= 0xf) {
-		return false;
+  if(typeof last_frame === 'undefined') {
+    last_frame = true;
+  }
+  
+  if(last_frame === false && opcode >= 0x8 && opcode <= 0xf) {
+    return false;
   }
 
-	var data = d || ''; //compress(d)	// TODO
+  var data = d || ''; //compress(d)  // TODO
   var length = WebSocket.Utils.byte_length(data);
   var header_length = 2;
   var mask_size = 6;
@@ -98,130 +98,132 @@ WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
   if(!this._masking_disabled){
     header_length += 4;
   }
-	
-	// apply per frame compression
-	var out = Ti.createBuffer({ length: length + header_length + mask_size });
-	var outIndex = 0;
-	
-	var byte1 = opcode;
-	if(last_frame) { 
-		byte1 = byte1 | 0x80;
-	}
-
-	Ti.Codec.encodeNumber({
-		source: byte1,
-		dest: out,
-		position: outIndex++,
-		type: Ti.Codec.TYPE_BYTE,
-	});
-	
-	if(length <= 125) {
-		var byte2 = length;
-		if(!this._masking_disabled) {
-			byte2 = (byte2 | 0x80); // # set masking bit
-		}
-		Ti.Codec.encodeNumber({
-			source: byte2,
-			dest: out,
-			position: outIndex++,
-			type: Ti.Codec.TYPE_BYTE
-		});
+  
+  // apply per frame compression
+  var out = Ti.createBuffer({ length: length + header_length + mask_size });
+  var outIndex = 0;
+  
+  var byte1 = opcode;
+  if(last_frame) { 
+    byte1 = byte1 | 0x80;
   }
+
+  Ti.Codec.encodeNumber({
+    source: byte1,
+    dest: out,
+    position: outIndex++,
+    type: Ti.Codec.TYPE_BYTE,
+  });
+  
+  if(length <= 125) {
+    var byte2 = length;
+    if(!this._masking_disabled) {
+      byte2 = (byte2 | 0x80); // # set masking bit
+    }
+    Ti.Codec.encodeNumber({
+      source: byte2,
+      dest: out,
+      position: outIndex++,
+      type: Ti.Codec.TYPE_BYTE
+    });
+  }
+  /*
   else if(length < WebSocket.BUFFER_SIZE) { // # write 2 byte length
-		Ti.Codec.encodeNumber({
-			source: (126 | 0x80),
-			dest: out,
-			position: outIndex++,
-			type: Ti.Codec.TYPE_BYTE
-		});
-		Ti.Codec.encodeNumber({
-			source: length,
-			dest: out,
-			position: outIndex++,
-			type: Ti.Codec.TYPE_SHORT,
-			byteOrder: Ti.Codec.BIG_ENDIAN
-		});
-		outIndex += 2;
+    Ti.Codec.encodeNumber({
+      source: (126 | 0x80),
+      dest: out,
+      position: outIndex++,
+      type: Ti.Codec.TYPE_BYTE
+    });
+    Ti.Codec.encodeNumber({
+      source: length,
+      dest: out,
+      position: outIndex++,
+      type: Ti.Codec.TYPE_SHORT,
+      byteOrder: Ti.Codec.BIG_ENDIAN
+    });
+    outIndex += 2;
   }
-  else { //	# write 8 byte length
-		Ti.Codec.encodeNumber({
-			source: (127 | 0x80),
-			dest: out,
-			position: outIndex++,
-			type: Ti.Codec.TYPE_BYTE
-		});
-		Ti.Codec.encodeNumber({
-			source: length,
-			dest: out,
-			position: outIndex,
-			type: Ti.Codec.TYPE_LONG,
-			byteOrder: Ti.Codec.BIG_ENDIAN
-		});
+  */
+  else { //  # write 8 byte length
+    Ti.Codec.encodeNumber({
+      source: (127 | 0x80),
+      dest: out,
+      position: outIndex++,
+      type: Ti.Codec.TYPE_BYTE
+    });
+    Ti.Codec.encodeNumber({
+      source: length,
+      dest: out,
+      position: outIndex,
+      type: Ti.Codec.TYPE_LONG,
+      byteOrder: Ti.Codec.BIG_ENDIAN
+    });
     outIndex += 8;
-	}
+  }
 
-	//# mask data
-	outIndex = this._mask_payload(out, outIndex, data);
-	out.length = outIndex;
-	
-	return out;
+  //# mask data
+  outIndex = this._mask_payload(out, outIndex, data);
+  out.length = outIndex;
+  
+  return out;
 };
 
 WebSocket.prototype._mask_payload = function(out, outIndex, payload) {
-	if(!this._masking_disabled) {
-		var i, masking_key = [];
-		for(i = 0; i < 4; ++i) {
-			var key = Math.floor(Math.random()*255) & 0xff;
-			masking_key.push(key);
-			Ti.Codec.encodeNumber({
-				source: key,
-				dest: out,
-				position: outIndex++,
-				type: Ti.Codec.TYPE_BYTE
-			});
-		}
-		
-		var buffer = Ti.createBuffer({ length: WebSocket.BUFFER_SIZE });
-		var length = Ti.Codec.encodeString({
-			source: payload,
-			dest: buffer
-		});
+  if(!this._masking_disabled) {
+    var i, masking_key = [];
+    for(i = 0; i < 4; ++i) {
+      var key = Math.floor(Math.random()*255) & 0xff;
+      masking_key.push(key);
+      Ti.Codec.encodeNumber({
+        source: key,
+        dest: out,
+        position: outIndex++,
+        type: Ti.Codec.TYPE_BYTE
+      });
+    }
+    
+    var buffer = Ti.createBuffer({ length: WebSocket.BUFFER_SIZE });
+    var length = Ti.Codec.encodeString({
+      source: payload,
+      dest: buffer
+    });
     buffer.length = length;
-		
-		var string = Ti.Codec.decodeString({
-			source: buffer,
-			charset: Ti.Codec.CHARSET_ASCII
+    
+    var string = Ti.Codec.decodeString({
+      source: buffer,
+      charset: Ti.Codec.CHARSET_ASCII
     });
     
     if(out.length < length){
-  	  out.length = string.length;
+      out.length = string.length;
     }
 
-		for(i = 0; i < string.length; ++i) {
-			Ti.Codec.encodeNumber({
-				source: string.charCodeAt(i) ^ masking_key[i % 4],
-				dest: out,
-				position: outIndex++,
-				type: Ti.Codec.TYPE_BYTE
-			});
-		}
-		return outIndex;
-	}
-	else {
-		var len = Ti.Codec.encodeString({
-			source: payload,
-			dest: out,
-			destPosition: outIndex
-		});
-		return len + outIndex;
-	}
+    for(i = 0; i < string.length; ++i) {
+      Ti.Codec.encodeNumber({
+        source: string.charCodeAt(i) ^ masking_key[i % 4],
+        dest: out,
+        position: outIndex++,
+        type: Ti.Codec.TYPE_BYTE
+      });
+    }
+    return outIndex;
+  }
+  else {
+    var len = Ti.Codec.encodeString({
+      source: payload,
+      dest: out,
+      destPosition: outIndex
+    });
+    return len + outIndex;
+  }
 };
 WebSocket.prototype.send = function(data) {
   if(data && this.readyState === WebSocket.readyState.OPEN) {
     var buffer = Ti.createBuffer({ value: data });
-		var string = Ti.Codec.decodeString({
-			source: buffer,
-			charset: Ti.Codec.CHARSET_ASCII
+    var string = Ti.Codec.decodeString({
+      source: buffer,
+      charset: Ti.Codec.CHARSET_ASCII
     });
     var stringLength = string.length;
     if(stringLength < WebSocket.BUFFER_SIZE){
@@ -270,10 +272,10 @@ WebSocket.prototype.send = function(data) {
       return false;
     }
     return true;
-	}
-	else {
-		return false;
-	}
+  }
+  else {
+    return false;
+  }
 };
 io.Transport.websocket.prototype.open = function (){
   var query = io.util.query(this.socket.options.query)
