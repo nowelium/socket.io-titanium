@@ -36,6 +36,9 @@ var WebSocket = function(url, protocols, origin, extensions) {
 	
 	this._socket = undefined;
 	
+	this._fragmentSize = BUFFER_SIZE;
+	this._sending = false;
+
 	this._connect();
 };
 exports.WebSocket = WebSocket;
@@ -200,11 +203,24 @@ WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
 		return false;
 	}
 	
-	// apply per frame compression
-	var out = Ti.createBuffer({ length: BUFFER_SIZE });
-	var outIndex = 0;
-
 	var data = d || ''; //compress(d)	// TODO
+  var length = Utils.byte_length(data);
+  var header_length = 2;
+  var mask_size = 6;
+
+  if(125 < length && length <= BUFFER_SIZE){
+    header_length += 2;
+  } else if(BUFFER_SIZE < length){
+    header_length += 8;
+  }
+
+  if(!this._masking_disabled){
+    header_length += 4;
+  }
+
+	// apply per frame compression
+	var out = Ti.createBuffer({ length: length + header_length + mask_size });
+	var outIndex = 0;
 	
 	var byte1 = opcode;
 	if(last_frame) { 
@@ -215,10 +231,8 @@ WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
 		source: byte1,
 		dest: out,
 		position: outIndex++,
-		type: Ti.Codec.TYPE_BYTE,
+		type: Ti.Codec.TYPE_BYTE
 	});
-	
-	var length = Utils.byte_length(data);
 	
 	if(length <= 125) {
 		var byte2 = length;
@@ -231,7 +245,8 @@ WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
 			position: outIndex++,
 			type: Ti.Codec.TYPE_BYTE
 		});
-	}
+  }
+  /*
 	else if(length < BUFFER_SIZE) { // # write 2 byte length
 		Ti.Codec.encodeNumber({
 			source: (126 | 0x80),
@@ -247,7 +262,8 @@ WebSocket.prototype._create_frame = function(opcode, d, last_frame) {
 			byteOrder: Ti.Codec.BIG_ENDIAN
 		});
 		outIndex += 2;
-	}
+  }
+  */
 	else { //	# write 8 byte length
 		Ti.Codec.encodeNumber({
 			source: (127 | 0x80),
@@ -296,15 +312,18 @@ WebSocket.prototype._mask_payload = function(out, outIndex, payload) {
 		var string = Ti.Codec.decodeString({
 			source: buffer,
 			charset: Ti.Codec.CHARSET_ASCII
-		});
+    });
+
+    if(out.length < length){
+  	  out.length = string.length;
+    }
 		
-		var masked_string = "";
 		for(i = 0; i < string.length; ++i) {
 			Ti.Codec.encodeNumber({
 				source: string.charCodeAt(i) ^ masking_key[i % 4],
 				dest: out,
 				position: outIndex++,
-				type: Ti.Codec.TYPE_BYTE,
+				type: Ti.Codec.TYPE_BYTE
 			});
 		}
 		return outIndex;
@@ -361,10 +380,86 @@ var parse_frame = function(buffer, size) {
 };
 
 WebSocket.prototype.send = function(data) {
+	var self = this;
 	if(data && this.readyState === OPEN) {
-		var frame = this._create_frame(0x01, data);
-		var bytesWritten = this._socket.write(frame);
-		return bytesWritten > 0;
+    if(self._sending){
+      return setTimeout(function (){
+        return self.send(data);
+      }, 100);
+    }
+
+    var buffer = Ti.createBuffer({ value: data });
+		var string = Ti.Codec.decodeString({
+			source: buffer,
+			charset: Ti.Codec.CHARSET_ASCII
+    });
+    var stringLength = string.length;
+    if(stringLength < BUFFER_SIZE){
+      var frame = this._create_frame(0x01, string);
+      var bytesWritten = this._socket.write(frame);
+      return 0 < bytesWritten;
+    }
+
+    // 
+    // fragment message
+    // http://tools.ietf.org/html/draft-ietf-hybi-thewebsocketprotocol-07#section-4.7
+    //
+    var fragment = function(string, stringLength){
+      self._sending = true;
+
+      var offset = 0;
+      var limit = self._fragmentSize;
+
+      var nextTick = function(){
+        // http://tools.ietf.org/html/draft-ietf-hybi-thewebsocketprotocol-07#section-4.7
+
+        var hasNext = false;
+        if(stringLength < (offset + limit)){
+          // last frame
+          fragment = string.substring(offset, stringLength);
+          frame = self._create_frame(0x80, fragment, true);
+        } else {
+          // fragment frame
+          fragment = string.substring(offset, offset + limit);
+          frame = self._create_frame(0x01, fragment, false);
+          hasNext = true;
+        }
+
+        return Ti.Stream.write(self._socket, frame, function(e){
+          if(0 < e.bytesProcessed){
+            offset += limit;
+          }
+          if(hasNext){
+            /*
+             * socket.io#hybi-07-12.js
+             * fragmented ping is not supported
+             *
+            var pingBuffer = Ti.createBuffer({ length: BUFFER_SIZE });
+            Ti.Codec.encodeNumber({
+              source: 0x09,
+              dest: pingBuffer,
+              position: 0,
+              type: Ti.Codec.TYPE_BYTE
+            });
+            Ti.Codec.encodeNumber({
+              source: 0,
+              dest: pingBuffer,
+              position: 1,
+              type: Ti.Codec.TYPE_BYTE
+            });
+
+            return Ti.Stream.write(self._socket, pingBuffer, function(){
+              return nextTick();
+            });
+            */
+            return setTimeout(nextTick, 1);
+          }
+          return self._sending = false;
+        });
+      };
+      return nextTick();
+    };
+    return fragment(string, stringLength);
 	}
 	else {
 		return false;
@@ -429,7 +524,8 @@ WebSocket.prototype._read_callback = function(e) {
 		}
 		else {
 			this.buffer.copy(this._socketReadBuffer, this.bufferSize, 0, e.bytesProcessed);
-			this.bufferSize += e.bytesProcessed;
+      this.bufferSize += e.bytesProcessed;
+      this.buffer.length += e.bytesProcessed;
 			this._socketReadBuffer.clear();
 		}
 	}
