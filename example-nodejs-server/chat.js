@@ -52,3 +52,17 @@ chat.on('connection', function(socket){
     });
   });
 });
+
+var image = io.of('/image');
+image.on('connection', function(socket){
+
+  socket.on('upload', function(param){
+    console.log('upload base64 size: %d', param.base64.length);
+  
+    if(param.download){
+      socket.emit('download', {
+        base64: 's' + new Array(65534).join('0') + 'e'
+      });
+    }
+  });
+});

@@ -10,6 +10,11 @@ var win_web = Titanium.UI.createWindow({
   title: 'webview',
   url: 'win_webview.js'
 });
+var win_upload = Titanium.UI.createWindow({
+  barColor: '#f9c',
+  title: 'upload',
+  url: 'win_upload.js'
+});
 
 var tabGroup = Titanium.UI.createTabGroup();
 tabGroup.addTab(Titanium.UI.createTab({
@@ -19,5 +24,9 @@ tabGroup.addTab(Titanium.UI.createTab({
 tabGroup.addTab(Titanium.UI.createTab({
   window: win_web,
   title: win_web.title
+}));
+tabGroup.addTab(Titanium.UI.createTab({
+  window: win_upload,
+  title: win_upload.title
 }));
 tabGroup.open();
