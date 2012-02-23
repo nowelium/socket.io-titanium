@@ -931,7 +931,7 @@ WebSocket.prototype._mask_payload = function(out, outIndex, payload) {
   if(!this._masking_disabled) {
     var i, masking_key = [];
     for(i = 0; i < 4; ++i) {
-      var key = Math.floor(Math.random()*255) & 0xff;
+      var key = Math.floor(Math.random() * 255) & 0xff;
       masking_key.push(key);
       Ti.Codec.encodeNumber({
         source: key,
@@ -940,41 +940,36 @@ WebSocket.prototype._mask_payload = function(out, outIndex, payload) {
         type: Ti.Codec.TYPE_BYTE
       });
     }
-    
-    var buffer = Ti.createBuffer({ length: BUFFER_SIZE });
-    var length = Ti.Codec.encodeString({
-      source: payload,
-      dest: buffer
-    });
-    buffer.length = length;
-    
+
+    var buffer = Ti.createBuffer({ value: payload });
     var string = Ti.Codec.decodeString({
       source: buffer,
       charset: Ti.Codec.CHARSET_ASCII
     });
+    var length = buffer.length;
 
     if(out.length < length){
-      out.length = string.length;
+      out.length = length;
     }
-    
-    for(i = 0; i < string.length; ++i) {
+
+    for(i = 0; i < length; ++i) {
       Ti.Codec.encodeNumber({
         source: string.charCodeAt(i) ^ masking_key[i % 4],
-        dest: out,
-        position: outIndex++,
+        dest: buffer,
+        position: i,
         type: Ti.Codec.TYPE_BYTE
       });
     }
-    return outIndex;
+    out.copy(buffer, outIndex, 0, length);
+    return outIndex + length;
   }
-  else {
-    var len = Ti.Codec.encodeString({
-      source: payload,
-      dest: out,
-      destPosition: outIndex
-    });
-    return len + outIndex;
-  }
+
+  var len = Ti.Codec.encodeString({
+    source: payload,
+    dest: out,
+    destPosition: outIndex
+  });
+  return len + outIndex;
 };
 
 var parse_frame = function(buffer, size) {
@@ -1018,28 +1013,6 @@ var parse_frame = function(buffer, size) {
   return({fin: fin, opcode: opcode, payload: string, size: len + offset});
 };
 
-WebSocket.prototype._write_callback = function(){
-  var self = this;
-
-  var nextTick = function(){
-    if(null == self._socket){
-      return;
-    }
-
-    if(self._writeQueue.length){
-      var buf = self._writeQueue.shift();
-
-      return Ti.Stream.write(self._socket, buf, function(e){
-        if(0 < e.bytesProcessed){
-          return nextTick();
-        }
-        return setTimeout(nextTick, 100);
-      });
-    }
-    return setTimeout(nextTick, 100);
-  };
-  return setTimeout(nextTick, 0);
-};
 WebSocket.prototype.send = function(data) {
   if(data && this.readyState === OPEN) {
     var buffer = Ti.createBuffer({ value: data });
@@ -1048,40 +1021,58 @@ WebSocket.prototype.send = function(data) {
       charset: Ti.Codec.CHARSET_ASCII
     });
 
+    var frame = null;
     var stringLength = string.length;
+    if(stringLength < BUFFER_SIZE){
+      frame = this._create_frame(0x01, string);
+      if(0 < this._socket.write(frame)){
+        return true;
+      }
+      return false;
+    }
 
-    var self = this;
-    var callback = function(string, stringLength){
-      return function(){
-        if(stringLength < BUFFER_SIZE){
-          return self._writeQueue.push(self._create_frame(0x01, string));
-        }
+    //
+    // http://tools.ietf.org/html/draft-ietf-hybi-thewebsocketprotocol-07#section-4.7
+    //
 
-        //
-        // http://tools.ietf.org/html/draft-ietf-hybi-thewebsocketprotocol-07#section-4.7
-        //
+    var offset = 0;
+    var limit = this._fragmentSize;
+    var fragment = null;
+    var isFirstFragment = true;
+    var opcode = 0x01;
+    var frames = [];
 
-        var offset = 0;
-        var limit = self._fragmentSize;
+    while(offset < stringLength){
+      if(stringLength < (offset + limit)){
+        break;
+      }
 
-        var nextTick = function(){
-          if(stringLength < (offset + limit)){
-            // last frame
-            fragment = string.substring(offset, stringLength);
-            return self._writeQueue.push(self._create_frame(0x80, fragment, true));
-          }
+      // fragment frame
+      fragment = string.substring(offset, limit - offset);
 
-          // fragment frame
-          fragment = string.substring(offset, offset + limit);
-          self._writeQueue.push(self._create_frame(0x01, fragment, false));
-          offset += limit;
-          return setTimeout(nextTick, 1);
-        };
-        return setTimeout(nextTick, 1);
-      };
-    };
-    setTimeout(callback(string, stringLength), 1);
-    return true;
+      // opcode:: fragment(0x80), text(0x01)
+      opcode = 0x80;
+      if(isFirstFragment){
+        opcode = 0x01;
+        isFirstFragment = false;
+      }
+      frame = this._create_frame(opcode, fragment, false);
+      frames.push(frame);
+      offset += limit;
+    }
+
+    // last frame
+    fragment = string.substring(offset, stringLength);
+    frame = this._create_frame(0x01, fragment, true);
+    frames.push(frame);
+
+    while(0 < frames.length){
+      frame = frames.shift();
+      if(this._socket.write(frame) < 1){
+        return false;
+      }
+    }
+    return false;
   }
   return false;
 };
@@ -1316,7 +1307,6 @@ WebSocket.prototype._connect = function() {
       self.onopen();
       
       self._read_callback();
-      self._write_callback();
     },
     closed: function() {
       self._socket_close();
