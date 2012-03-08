@@ -1,4 +1,3 @@
-
 /**
  * socket.io
  * Copyright(c) 2011 LearnBoost <dev@learnboost.com>
@@ -149,6 +148,7 @@
       var xhr = io.util.request();
 
       xhr.open('GET', url, true);
+      xhr.withCredentials = true;
       xhr.onreadystatechange = function () {
         if (xhr.readyState == 4) {
           xhr.onreadystatechange = empty;
@@ -208,6 +208,8 @@
         , self.options.transports
       );
 
+      self.setHeartbeatTimeout();
+
       function connect (transports){
         if (self.transport) self.transport.clearTimeouts();
 
@@ -260,6 +262,22 @@
   };
 
   /**
+   * Clears and sets a new heartbeat timeout using the value given by the
+   * server during the handshake.
+   *
+   * @api private
+   */
+
+  Socket.prototype.setHeartbeatTimeout = function () {
+    clearTimeout(this.heartbeatTimeoutTimer);
+
+    var self = this;
+    this.heartbeatTimeoutTimer = setTimeout(function () {
+      self.transport.onClose();
+    }, this.heartbeatTimeout);
+  };
+
+  /**
    * Sends a message.
    *
    * @param {Object} data packet.
@@ -300,7 +318,7 @@
    */
 
   Socket.prototype.disconnect = function () {
-    if (this.connected) {
+    if (this.connected || this.connecting) {
       if (this.open) {
         this.of('').packet({ type: 'disconnect' });
       }
@@ -385,6 +403,7 @@
 
   Socket.prototype.onClose = function () {
     this.open = false;
+    clearTimeout(this.heartbeatTimeoutTimer);
   };
 
   /**
@@ -405,9 +424,11 @@
 
   Socket.prototype.onError = function (err) {
     if (err && err.advice) {
-      if (err.advice === 'reconnect' && this.connected) {
+      if (err.advice === 'reconnect' && (this.connected || this.connecting)) {
         this.disconnect();
-        this.reconnect();
+        if (this.options.reconnect) {
+          this.reconnect();
+        }
       }
     }
 
@@ -421,19 +442,22 @@
    */
 
   Socket.prototype.onDisconnect = function (reason) {
-    var wasConnected = this.connected;
+    var wasConnected = this.connected
+      , wasConnecting = this.connecting;
 
     this.connected = false;
     this.connecting = false;
     this.open = false;
 
-    if (wasConnected) {
+    if (wasConnected || wasConnecting) {
       this.transport.close();
       this.transport.clearTimeouts();
-      this.publish('disconnect', reason);
+      if (wasConnected) {
+        this.publish('disconnect', reason);
 
-      if ('booted' != reason && this.options.reconnect && !this.reconnecting) {
-        this.reconnect();
+        if ('booted' != reason && this.options.reconnect && !this.reconnecting) {
+          this.reconnect();
+        }
       }
     }
   };
@@ -463,6 +487,8 @@
         }
         self.publish('reconnect', self.transport.name, self.reconnectionAttempts);
       }
+
+      clearTimeout(self.reconnectionTimer);
 
       self.removeListener('connect_failed', maybeReconnect);
       self.removeListener('connect', maybeReconnect);
