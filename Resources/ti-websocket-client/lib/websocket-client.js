@@ -378,7 +378,7 @@ WebSocket.prototype.send = function(data) {
     var buffer = Ti.createBuffer({ value: data });
     var string = Ti.Codec.decodeString({
       source: buffer,
-      charset: Ti.Codec.CHARSET_ASCII
+      charset: Ti.Codec.CHARSET_UTF8
     });
 
     var frame = null;
