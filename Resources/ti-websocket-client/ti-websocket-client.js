@@ -1183,9 +1183,36 @@ WebSocket.prototype._read_request = function(e, callback){
 };
 WebSocket.prototype._read_callback = function(e){
   var self = this;
+  var streamReadCallback = function(evt){
+    if(0 < evt.bytesProcessed){
+      return self._read_request(evt, function (){
+        //
+        // incoming data(wait:short)
+        //
+        return setTimeout(nextTick, 0);
+      });
+    }
+
+    //
+    // incoming data(wait:long)
+    //
+    return setTimeout(nextTick, 100);
+  };
   var nextTick = function(){
     if(0 < self.bufferSize){
-      return self._read_buffer(nextTick);
+      return self._read_buffer(function (readSuccess){
+        if(readSuccess){
+          return setTimeout(nextTick, 0);
+        }
+
+        //
+        // unknown read packet(success: false)
+        // then clear read buffer
+        //
+
+        self._socketReadBuffer.clear();
+        return Ti.Stream.read(self._socket, self._socketReadBuffer, streamReadCallback);
+      });
     }
 
     if(null == self._socket){
@@ -1194,12 +1221,7 @@ WebSocket.prototype._read_callback = function(e){
     }
 
     self._socketReadBuffer.clear();
-    return Ti.Stream.read(self._socket, self._socketReadBuffer, function(e){
-      if(0 < e.bytesProcessed){
-        return self._read_request(e, nextTick);
-      }
-      return setTimeout(nextTick, 0);
-    });
+    return Ti.Stream.read(self._socket, self._socketReadBuffer, streamReadCallback);
   };
   return setTimeout(nextTick, 0);
 };
