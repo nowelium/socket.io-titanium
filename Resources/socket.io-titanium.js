@@ -1,6 +1,6 @@
 var platform = {
   isAndroid: /android/i.test(Titanium.Platform.osname),
-  isIPhone: /iphone/i.test(Titanium.Platform.osname),
+  isIPhone: /iphone|ipad/i.test(Titanium.Platform.osname),
   os: function(obj){
     if(platform.isIPhone){
       return obj.iphone();
